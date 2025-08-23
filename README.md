@@ -57,12 +57,15 @@ target\release\cargo-builder.exe  # Windows
 After installation, verify it works:
 
 ```bash
-# Check installation
-cargo-builder --help
+# Check installation (preferred Cargo subcommand style)
+cargo builder --help
 
 # Test on any Rust project
 cd your-rust-project
-cargo-builder
+cargo builder
+
+# Also works as direct binary call
+cargo-builder --help
 ```
 
 ## 🛠️ Usage
@@ -70,58 +73,67 @@ cargo-builder
 ### Basic Usage
 
 ```bash
-# Basic usage - suppress warnings, show errors only
-cargo-builder
+# Basic usage - suppress warnings, show errors only (recommended)
+cargo builder
 
 # With cargo build flags (note the -- separator)
-cargo-builder -- --release --workspace
+cargo builder -- --release --workspace
 
 # Include warnings when you need them
-cargo-builder --include-warnings
+cargo builder --include-warnings
 
 # Quiet mode for scripts
-cargo-builder --quiet
+cargo builder --quiet
+```
+
+### Alternative: Direct Binary Call
+
+```bash
+# Also works as direct binary call
+cargo-builder
+cargo-builder -- --release --workspace
+cargo-builder --include-warnings
 ```
 
 ### Advanced Usage
 
 ```bash
 # Custom log file location
-cargo-builder --log ./my-build-errors.log
+cargo builder --log ./my-build-errors.log
 
 # Keep log file even on successful builds (useful for CI)
-cargo-builder --log-on-success
+cargo builder --log-on-success
 
 # Show all build output for debugging
-cargo-builder --show-build-output
+cargo builder --show-build-output
 
 # Disable colors in terminal output
-cargo-builder --terminal-color never
+cargo builder --terminal-color never
 
 # Enable colors in log files
-cargo-builder --log-color always
+cargo builder --log-color always
 ```
 
 ### Real-World Examples
 
 ```bash
 # Development: Focus on errors, ignore warnings
-cargo-builder
+cargo builder
 
 # Pre-commit: Check with warnings included
-cargo-builder --include-warnings
+cargo builder --include-warnings
 
 # CI/Release: Build optimized with persistent logging
-cargo-builder --log-on-success -- --release
+cargo builder --log-on-success -- --release
 
 # Debug build issues: See all cargo output
-cargo-builder --show-build-output --include-warnings
+cargo builder --show-build-output --include-warnings
 
 # Cross-compilation
-cargo-builder -- --target x86_64-pc-windows-gnu
+cargo builder -- --target x86_64-pc-windows-gnu
 
 # Workspace builds
-cargo-builder -- --workspace --exclude problematic-crate
+cargo builder -- --workspace --exclude problematic-crate
 ```
 
 ## Command Line Options
@@ -169,9 +181,9 @@ error[E0425]: cannot find function `undefined_func` in this scope
 error: could not compile `my-project` due to 1 previous error; 2 warnings emitted
 ```
 
-### After: Clean `cargo-builder`
+### After: Clean `cargo builder`
 ```
-$ cargo-builder
+$ cargo builder
 cargo-builder: Running build with errors-only output...
 cargo-builder: Starting build...
 error[E0425]: cannot find function `undefined_func` in this scope

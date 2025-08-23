@@ -6,6 +6,7 @@ mod util;
 
 use clap::{Arg, ArgAction, Command};
 use anyhow::Result;
+use std::env;
 
 #[derive(Debug)]
 pub struct Config {
@@ -51,8 +52,18 @@ fn main() -> Result<()> {
 }
 
 fn parse_args() -> Result<Config> {
+    // Handle cargo subcommand - when called as "cargo builder", the first arg is "builder"
+    let args: Vec<String> = env::args().collect();
+    let args_to_parse = if args.len() > 1 && args[1] == "builder" {
+        // Skip the "builder" subcommand argument
+        [&args[0..1], &args[2..]].concat()
+    } else {
+        args
+    };
+
     let matches = Command::new("cargo-builder")
         .about("A Cargo build wrapper that shows errors-only output with optional logging")
+        .long_about("A Cargo build wrapper that shows errors-only output with optional logging.\n\nUsage:\n  cargo builder [OPTIONS] [-- [cargo-args]...]\n  cargo-builder [OPTIONS] [-- [cargo-args]...]")
         .version("0.1.0")
         .arg(
             Arg::new("log")
@@ -106,7 +117,7 @@ fn parse_args() -> Result<Config> {
                 .num_args(0..)
                 .help("Arguments to pass to cargo build")
         )
-        .get_matches();
+        .try_get_matches_from(args_to_parse)?;
 
     let config = Config {
         log_path: matches.get_one::<String>("log").cloned(),
