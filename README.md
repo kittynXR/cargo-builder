@@ -17,7 +17,7 @@ A Cargo build wrapper that provides errors-only output with optional logging.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/cargo-builder.git
+git clone https://github.com/kittynXR/cargo-builder.git
 cd cargo-builder
 
 # Build and install
