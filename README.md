@@ -73,13 +73,13 @@ cargo-builder --help
 ### Basic Usage
 
 ```bash
-# Basic usage - suppress warnings, show errors only (recommended)
+# Basic usage - suppress warnings, show compilation progress and errors
 cargo builder
 
-# With cargo build flags (note the -- separator)
-cargo builder -- --release --workspace
+# Pass cargo build flags directly (no -- separator needed!)
+cargo builder --release --workspace
 
-# Include warnings when you need them
+# Include warnings when you need them  
 cargo builder --include-warnings
 
 # Quiet mode for scripts
@@ -90,50 +90,58 @@ cargo builder --quiet
 
 ```bash
 # Also works as direct binary call
-cargo-builder
-cargo-builder -- --release --workspace
+cargo-builder --release --workspace
 cargo-builder --include-warnings
+
+# Legacy syntax still supported for compatibility
+cargo builder -- --release --workspace
 ```
 
 ### Advanced Usage
 
 ```bash
 # Custom log file location
-cargo builder --log ./my-build-errors.log
+cargo builder --log ./my-build-errors.log --release
 
 # Keep log file even on successful builds (useful for CI)
-cargo builder --log-on-success
+cargo builder --log-on-success --workspace
 
-# Show all build output for debugging
-cargo builder --show-build-output
+# Show all cargo output (including warnings, debug output)
+cargo builder --show-build-output --verbose
 
 # Disable colors in terminal output
-cargo builder --terminal-color never
+cargo builder --terminal-color never --release
 
-# Enable colors in log files
-cargo builder --log-color always
+# Enable colors in log files  
+cargo builder --log-color always --workspace
+
+# Mix tool flags with cargo flags seamlessly
+cargo builder --quiet --include-warnings --release -p mypackage
 ```
 
 ### Real-World Examples
 
 ```bash
-# Development: Focus on errors, ignore warnings
+# Development: Focus on errors, ignore warnings, see build progress
 cargo builder
 
 # Pre-commit: Check with warnings included
-cargo builder --include-warnings
+cargo builder --include-warnings --workspace
 
 # CI/Release: Build optimized with persistent logging
-cargo builder --log-on-success -- --release
+cargo builder --log-on-success --release
 
 # Debug build issues: See all cargo output
 cargo builder --show-build-output --include-warnings
 
 # Cross-compilation
-cargo builder -- --target x86_64-pc-windows-gnu
+cargo builder --target x86_64-pc-windows-gnu
 
-# Workspace builds
-cargo builder -- --workspace --exclude problematic-crate
+# Workspace builds with specific packages
+cargo builder --workspace --exclude problematic-crate
+
+# Complex multi-flag example
+cargo builder --quiet --include-warnings --log-on-success --release -p core -p utils
 ```
 
 ## Command Line Options
@@ -148,11 +156,28 @@ cargo builder -- --workspace --exclude problematic-crate
 
 ## How It Works
 
-1. **Warning Suppression**: Adds `-Awarnings` to `RUSTFLAGS` unless `--include-warnings` is specified
-2. **JSON Parsing**: Uses `--message-format=json-diagnostic-rendered-ansi` to parse Cargo's structured output
-3. **Error Extraction**: Filters JSON messages for compiler errors and formats them for display
-4. **Smart Logging**: Creates log files only when errors occur, removes them on successful builds
-5. **Exit Code Preservation**: Returns the same exit code as the underlying `cargo build` command
+1. **Smart Argument Parsing**: Separates tool flags from cargo flags automatically - no `--` separator required
+2. **Warning Suppression**: Adds `-Awarnings` to `RUSTFLAGS` unless `--include-warnings` is specified  
+3. **Hybrid Output**: Shows compilation progress via stderr, parses errors/warnings via JSON stdout
+4. **Error Extraction**: Uses `--message-format=json-diagnostic-rendered-ansi` for precise error handling
+5. **Smart Logging**: Creates log files only when errors occur, removes them on successful builds
+6. **Exit Code Preservation**: Returns the same exit code as the underlying `cargo build` command
+
+### What You See vs What You Don't
+
+✅ **Always Visible:**
+- Compilation progress ("Compiling package v1.0.0...")
+- Build status and timing
+- Error messages with full formatting
+
+❌ **Suppressed by Default:**
+- Warning messages (enable with `--include-warnings`)
+- Verbose cargo output (enable with `--show-build-output`)
+
+✅ **Smart Features:**
+- Pass cargo flags directly: `cargo builder --release --workspace`  
+- Mix tool and cargo flags: `cargo builder --quiet --release -p mypackage`
+- Automatic log cleanup on successful builds
 
 ## 🔍 Why cargo-builder?
 

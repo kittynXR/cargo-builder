@@ -51,19 +51,80 @@ fn main() -> Result<()> {
     std::process::exit(exit_code);
 }
 
+fn separate_arguments(args: &[String]) -> (Vec<String>, Vec<String>) {
+    // Define our tool's flags that take values
+    let tool_flags_with_values = [
+        "--log",
+        "--log-color", 
+        "--terminal-color",
+    ];
+
+    // Define our tool's boolean flags
+    let tool_boolean_flags = [
+        "--log-on-success",
+        "--include-warnings", 
+        "--show-build-output",
+        "--quiet", "-q",
+        "--help", "-h",
+        "--version", "-V",
+    ];
+
+    let mut tool_args = Vec::new();
+    let mut cargo_args = Vec::new();
+    let mut i = 0;
+
+    while i < args.len() {
+        let arg = &args[i];
+        
+        // Handle special case: explicit separator
+        if arg == "--" {
+            // Everything after -- goes to cargo
+            cargo_args.extend_from_slice(&args[i + 1..]);
+            break;
+        }
+
+        // Check if this is one of our tool flags
+        if tool_boolean_flags.contains(&arg.as_str()) {
+            tool_args.push(arg.clone());
+            i += 1;
+        } else if tool_flags_with_values.contains(&arg.as_str()) {
+            tool_args.push(arg.clone());
+            // Take the next argument as the value
+            if i + 1 < args.len() {
+                tool_args.push(args[i + 1].clone());
+                i += 2;
+            } else {
+                // Flag without value, let clap handle the error
+                tool_args.push(arg.clone());
+                i += 1;
+            }
+        } else {
+            // Not one of our flags, must be a cargo argument
+            cargo_args.push(arg.clone());
+            i += 1;
+        }
+    }
+
+    (tool_args, cargo_args)
+}
+
 fn parse_args() -> Result<Config> {
     // Handle cargo subcommand - when called as "cargo builder", the first arg is "builder"
     let args: Vec<String> = env::args().collect();
-    let args_to_parse = if args.len() > 1 && args[1] == "builder" {
+    let raw_args = if args.len() > 1 && args[1] == "builder" {
         // Skip the "builder" subcommand argument
-        [&args[0..1], &args[2..]].concat()
+        args[2..].to_vec()
     } else {
-        args
+        args[1..].to_vec()
     };
 
+    // Separate our tool flags from cargo flags
+    let (tool_args, cargo_args) = separate_arguments(&raw_args);
+
+    // Parse our tool's arguments
     let matches = Command::new("cargo-builder")
         .about("A Cargo build wrapper that shows errors-only output with optional logging")
-        .long_about("A Cargo build wrapper that shows errors-only output with optional logging.\n\nUsage:\n  cargo builder [OPTIONS] [-- [cargo-args]...]\n  cargo-builder [OPTIONS] [-- [cargo-args]...]")
+        .long_about("A Cargo build wrapper that shows errors-only output with optional logging.\n\nUsage:\n  cargo builder [OPTIONS] [cargo-build-args...]\n  cargo-builder [OPTIONS] [cargo-build-args...]")
         .version("0.1.0")
         .arg(
             Arg::new("log")
@@ -102,7 +163,7 @@ fn parse_args() -> Result<Config> {
             Arg::new("show-build-output")
                 .long("show-build-output")
                 .action(ArgAction::SetTrue)
-                .help("Also mirror Cargo's raw stderr")
+                .help("Show all raw cargo output (for debugging cargo issues)")
         )
         .arg(
             Arg::new("quiet")
@@ -111,13 +172,7 @@ fn parse_args() -> Result<Config> {
                 .action(ArgAction::SetTrue)
                 .help("Minimize plugin output")
         )
-        .arg(
-            Arg::new("cargo-args")
-                .last(true)
-                .num_args(0..)
-                .help("Arguments to pass to cargo build")
-        )
-        .try_get_matches_from(args_to_parse)?;
+        .try_get_matches_from(std::iter::once("cargo-builder".to_string()).chain(tool_args))?;
 
     let config = Config {
         log_path: matches.get_one::<String>("log").cloned(),
@@ -132,9 +187,7 @@ fn parse_args() -> Result<Config> {
         include_warnings: matches.get_flag("include-warnings"),
         show_build_output: matches.get_flag("show-build-output"),
         quiet: matches.get_flag("quiet"),
-        cargo_args: matches.get_many::<String>("cargo-args")
-            .map(|vals| vals.cloned().collect())
-            .unwrap_or_default(),
+        cargo_args,
     };
 
     Ok(config)

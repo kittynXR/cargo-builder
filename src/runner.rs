@@ -24,9 +24,11 @@ pub fn run_build(config: &Config) -> Result<i32> {
     // Configure stdio
     cmd.stdout(Stdio::piped());
     if config.show_build_output {
+        // Show ALL output including warnings
         cmd.stderr(Stdio::inherit());
     } else {
-        cmd.stderr(Stdio::piped());
+        // Show build progress but capture for fallback error handling
+        cmd.stderr(Stdio::inherit());
     }
 
     if !config.quiet {
@@ -38,16 +40,10 @@ pub fn run_build(config: &Config) -> Result<i32> {
 
     let stdout = child.stdout.take()
         .context("Failed to capture stdout")?;
-    let stderr = if !config.show_build_output {
-        child.stderr.take()
-    } else {
-        None
-    };
 
     let mut logger = logging::Logger::new(&log_path, config)?;
     let mut build_success = None;
     let mut has_errors = false;
-    let mut captured_stderr = Vec::new();
 
     // Process stdout (JSON messages)
     let stdout_reader = BufReader::new(stdout);
@@ -59,18 +55,18 @@ pub fn run_build(config: &Config) -> Result<i32> {
                 match level.as_str() {
                     "error" => {
                         has_errors = true;
-                        let terminal_output = diagnostics::format_for_terminal(&rendered, config);
-                        eprint!("{}", terminal_output);
+                        // Print error to stderr and log it
+                        eprint!("{}", rendered);
                         logger.log_error(&rendered)?;
                     }
                     "warning" if config.include_warnings => {
-                        let terminal_output = diagnostics::format_for_terminal(&rendered, config);
-                        eprint!("{}", terminal_output);
+                        // Print warning to stderr when warnings are enabled
+                        eprint!("{}", rendered);
                         if config.log_on_success {
                             logger.log_error(&rendered)?;
                         }
                     }
-                    _ => {} // Ignore other levels
+                    _ => {} // Ignore other levels (like notes, help, etc.)
                 }
             }
             Some(diagnostics::CargoMessage::BuildFinished { success }) => {
@@ -80,27 +76,17 @@ pub fn run_build(config: &Config) -> Result<i32> {
         }
     }
 
-    // Process stderr if we're capturing it
-    if let Some(stderr) = stderr {
-        let stderr_reader = BufReader::new(stderr);
-        for line in stderr_reader.lines() {
-            let line = line.context("Failed to read stderr line")?;
-            captured_stderr.push(line);
-        }
-    }
-
     let exit_status = child.wait()
         .context("Failed to wait for cargo build process")?;
 
     let exit_code = exit_status.code().unwrap_or(1);
     let final_success = build_success.unwrap_or(exit_code == 0);
 
-    // Handle case where build failed but we didn't capture error messages
-    if !final_success && !has_errors && !captured_stderr.is_empty() {
-        let stderr_content = captured_stderr.join("\n");
-        eprintln!("Build failed; details in log file: {}", log_path);
-        logger.log_error(&stderr_content)?;
-        has_errors = true;
+    // Handle case where build failed but we didn't capture any JSON error messages
+    if !final_success && !has_errors {
+        if !config.quiet {
+            eprintln!("cargo-builder: Build failed (no specific error messages captured)");
+        }
     }
 
     // Finalize logging
