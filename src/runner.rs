@@ -107,14 +107,20 @@ pub fn run_build(config: &Config) -> Result<i32> {
 }
 
 fn setup_environment(cmd: &mut Command, config: &Config) -> Result<()> {
-    // Handle RUSTFLAGS
+    // Handle RUSTFLAGS - only modify if needed to preserve build cache
     if !config.include_warnings {
-        let mut rustflags = env::var("RUSTFLAGS").unwrap_or_default();
-        if !rustflags.is_empty() {
-            rustflags.push(' ');
+        let existing_rustflags = env::var("RUSTFLAGS").unwrap_or_default();
+        
+        // Check if -Awarnings is already present to avoid cache invalidation
+        if !existing_rustflags.contains("-Awarnings") {
+            let mut rustflags = existing_rustflags;
+            if !rustflags.is_empty() {
+                rustflags.push(' ');
+            }
+            rustflags.push_str("-Awarnings");
+            cmd.env("RUSTFLAGS", rustflags);
         }
-        rustflags.push_str("-Awarnings");
-        cmd.env("RUSTFLAGS", rustflags);
+        // If -Awarnings already exists, don't modify RUSTFLAGS to preserve cache
     }
 
     // Handle CARGO_TERM_COLOR for terminal output
